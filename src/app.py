@@ -5,6 +5,8 @@ class Scheduler:
         self.rooms = rooms
         self.students = students
         self.teachers = teachers
+        self.days = days
+        self.time_slots = time_slots
 
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
@@ -24,100 +26,51 @@ class Scheduler:
 
         # Define constraints and solve the model
         self.define_constraints()
+
+        #solve
         self.solve()
 
     def define_rooms_variable(self):
-        room_variables = {}
-        for room in self.rooms:
-            room_name = room['name']
-            room_type = room['type']
-            room_variables[(room_name, room_type)] = self.model.NewBoolVar(f"{room_name}, {room_type}")
-        return room_variables
-    
+        return {(room['name'], room['type']): self.model.NewBoolVar(f"{room['name']}, {room['type']}") for room in self.rooms}
+
     def define_teachers_variable(self):
-        teachers_variable = {}
-        for teacher in self.teachers:
-            teacher_name = teacher['name']
-            teacher_specialized = teacher['specialized']
-            teachers_variable[(teacher_name, teacher_specialized)] = self.model.NewBoolVar(f"{teacher_name}, {teacher_specialized}")
-        return teachers_variable
-    
+        return {(teacher['name'], teacher['specialized']): self.model.NewBoolVar(f"{teacher['name']}, {teacher['specialized']}") for teacher in self.teachers}
+
     def define_students_variable(self):
         students_variable = {}
         for student in self.students:
-            student_program = student['program']
-            student_year = student['year']
-            student_semester = student['semester']
-            student_block = student['block']
-            student_courses = student['courses']
-            for course in student_courses:
-                course_code = course['code']
-                course_description = course['description']
-                course_units = course['units']
-                course_type = course['type']
-                assign = (student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type)
+            for course in student['courses']:
+                assign = (student['program'], student['year'], student['semester'], student['block'],
+                          course['code'], course['description'], course['units'], course['type'])
                 students_variable[assign] = self.model.NewBoolVar(str(assign))
         return students_variable
 
     def declare_room_assignments(self):
-        for room_name, room_type in self.rooms_variable:
-            for student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type in self.students_variable:
-                if room_type == course_type:
-                    assign = (student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type, room_name, room_type)
-                    self.room_assignments[assign] = self.model.NewBoolVar(str(assign))
+        for room in self.rooms_variable:
+            for assign in self.students_variable:
+                if room[1] == assign[7]:
+                    self.room_assignments[(assign + (room[0], room[1]))] = self.model.NewBoolVar(str(assign))
 
     def declare_teacher_assignments(self):
-        for teacher_name, teacher_specialized in self.teachers_variable:
-            for student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type in self.students_variable:
-                if teacher_specialized == course_code:
-                    assign = (student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type, teacher_name, teacher_specialized)
-                    self.teacher_assignments[assign] = self.model.NewBoolVar(str(assign))
+        for teacher in self.teachers_variable:
+            for assign in self.students_variable:
+                if teacher[1] == assign[4]:  
+                    self.teacher_assignments[(
+                        assign + (teacher[0], teacher[1]))] = self.model.NewBoolVar(str(assign))
 
     def define_constraints(self):
         # Each student is assigned to exactly one room
-        for student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type in self.students_variable:
+        for student in self.students_variable:
             self.model.Add(
-                sum(
-                    self.room_assignments.get(
-                        (
-                            student_program,
-                            student_year,
-                            student_semester,
-                            student_block,
-                            course_code,
-                            course_description,
-                            course_units,
-                            course_type,
-                            room_name,
-                            room_type,
-                        ),
-                        0
-                    )
-                    for room_name, room_type in self.rooms_variable
-                ) == 1
+                sum(self.room_assignments.get(
+                    student + (room[0], room[1]), 0) for room in self.rooms_variable) == 1
             )
 
         # Each teacher is assigned to exactly one student
-        for teacher_name, teacher_specialized in self.teachers_variable:
+        for teacher in self.teachers_variable:
             self.model.Add(
-                sum(
-                    self.teacher_assignments.get(
-                        (
-                            student_program,
-                            student_year,
-                            student_semester,
-                            student_block,
-                            course_code,
-                            course_description,
-                            course_units,
-                            course_type,
-                            teacher_name,
-                            teacher_specialized,
-                        ),
-                        0
-                    )
-                    for student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type in self.students_variable
-                ) == 1
+                sum(self.teacher_assignments.get(
+                        (student + (teacher[0], teacher[1])), 0)for student in self.students_variable) == 1
             )
 
     def solve(self):
@@ -127,34 +80,32 @@ class Scheduler:
 
         # Solve the model
         status = self.solver.Solve(self.model)
+        print("Status: ", status)
 
         if status == cp_model.OPTIMAL:
-            print("Optimal solution found.")
 
             # Print assignments
             print("\nAssignments:")
-            for student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type, room_name, room_type in self.room_assignments:
-                for t_student_program, t_student_year, t_student_semester, t_student_block, t_course_code, t_course_description, t_course_units, t_course_type, teacher_name, teacher_specialized in self.teacher_assignments:
-                    if (student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type) == (
-                            t_student_program, t_student_year, t_student_semester, t_student_block, t_course_code, t_course_description, t_course_units, t_course_type
-                        ):
-                        if (
-                            self.solver.Value(self.room_assignments[(student_program, student_year, student_semester, student_block, course_code, course_description, course_units, course_type, room_name, room_type)]) == 1 and
-                            self.solver.Value(self.teacher_assignments[(t_student_program, t_student_year, t_student_semester, t_student_block, t_course_code, t_course_description, t_course_units, t_course_type, teacher_name, teacher_specialized)]) == 1
-                        ):
-                            print(
-                                str(student_program),
-                                str(student_year),
-                                str(student_semester),
-                                str(student_block),
-                                str(course_code),
-                                str(course_description),
-                                str(course_units),
-                                str(course_type),
-                                str(room_name),
-                                str(room_type),
-                                str(teacher_name),
-                                str(teacher_specialized),
+            for room in self.room_assignments:
+                for teacher in self.teacher_assignments:
+                        if room[:8] == teacher[:8]:
+                            if (
+                                self.solver.Value(self.room_assignments[room]) == 1 and
+                                self.solver.Value(self.teacher_assignments[teacher]) == 1
+                            ):
+                                print(
+                                str(room[0]),
+                                str(room[1]),
+                                str(room[2]),
+                                str(room[3]),
+                                str(room[4]),
+                                str(room[5]),
+                                str(room[6]),
+                                str(room[7]),
+                                str(room[8]),
+                                str(room[9]),
+                                str(teacher[-2]),
+                                str(teacher[-1])
                             )
 
         else:
