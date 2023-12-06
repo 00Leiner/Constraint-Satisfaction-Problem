@@ -7,14 +7,14 @@ teachers = [
         'name': "Prof. Johnson",
         'specialized': "CS 2102",
     },
-    {
-        'name': "Dr. Williams",
-        'specialized': "IT 3205",
-    },
-    {
-        'name': "Prof. Davis",
-        'specialized': "IT 3206",
-    }
+    #{
+    #    'name': "Dr. Williams",
+    #    'specialized': "IT 3205",
+    #},
+    #{
+    #    'name': "Prof. Davis",
+    #    'specialized': "IT 3206",
+    #}
 ]
 
 students = [
@@ -39,27 +39,27 @@ students = [
             # Add more courses
         ]
     },
-    {
-        'program': "BSIT",
-        'year': "3",
-        'semester': "2",
-        'block': "A",
-        'courses': [
-            {
-                'code': "IT 3205",
-                'description': "Web Development",
-                'units': "3",
-                'type': "lec",
-            },
-            {
-                'code': "IT 3206",
-                'description': "Database Management",
-                'units': "3",
-                'type': "lab",
-            },
+    #{
+    #    'program': "BSIT",
+    #    'year': "3",
+    #    'semester': "2",
+     #   'block': "A",
+     #   'courses': [
+     #       {
+     #           'code': "IT 3205",
+     #           'description': "Web Development",
+     #           'units': "3",
+     #           'type': "lec",
+     #       },
+     #       {
+     #           'code': "IT 3206",
+     #           'description': "Database Management",
+     #           'units': "3",
+      #          'type': "lab",
+      #      },
             # Add more courses
-        ]
-    },
+      #  ]
+   # },
     # Add more students
 ]
 
@@ -72,12 +72,12 @@ rooms = [
         'name': "Classroom A",
         'type': "lec",
     },
-    {
-        'name': "Classroom 2",
-        'type': "lab",
-    },
-    {
-        'name': "Classroom B",
-        'type': "lec",
-    }
+    #{
+    #    'name': "Classroom 2",
+    #    'type': "lab",
+    #},
+    #{
+    #    'name': "Classroom B",
+    #    'type': "lec",
+    #}
 ]

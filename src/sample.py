@@ -9,15 +9,18 @@ HOUR_START = 7
 TimeSlot = namedtuple('TimeSlot', ['day', 'hour'])
 
 def schedule_courses(course_and_unit):
+    # Create the CP-SAT model.
+    model = cp_model.CpModel()
+    # Create a solver and solve the model.
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
+
     # Extract courses and units from the dictionary.
     courses = list(course_and_unit.keys())
 
     # Constants for time slots and days.
     time_slots = [TimeSlot(day, hour) for day in range(DAYS) for hour in range(HOURS_PER_DAY)]
-
-    # Create the CP-SAT model.
-    model = cp_model.CpModel()
-
+    
     # Define variables representing the schedule for each course unit.
     course_schedule = {}
     for course in courses:
@@ -28,15 +31,14 @@ def schedule_courses(course_and_unit):
     # Ensure that each course unit is scheduled exactly once.
     for course in courses:
         for unit in range(1, int(course_and_unit[course]) + 1):
-            model.Add(sum(course_schedule[(course, unit, time_slot)] for time_slot in time_slots) == 1)
+            model.Add(sum(course_schedule[(
+                course, unit, time_slot)
+                ] for time_slot in time_slots) == 1)
 
     # Ensure that each time slot is occupied by at most one course unit.
     for time_slot in time_slots:
         model.Add(sum(course_schedule[(course, unit, time_slot)] for course in courses for unit in range(1, int(course_and_unit[course]) + 1)) <= 1)
 
-    # Create a solver and solve the model.
-    solver = cp_model.CpSolver()
-    status = solver.Solve(model)
 
     # Print the solution.
     if status == cp_model.OPTIMAL:
@@ -57,7 +59,13 @@ course_and_unit = {
     'course3': '2',
     'course4': '2',
     'course5': '3',
-    'course6': '1'
+    'course6': '1',
+    'course7': '3',
+    'course8': '3',
+    'course9': '2',
+    'course10': '2',
+    'course11': '3',
+    'course12': '1'
 }
 
 schedule_courses(course_and_unit)
