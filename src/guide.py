@@ -65,9 +65,10 @@ class Scheduler:
             for unit in range(1, int(student[6]) + 1):
                 for time_slot in self.time_slots:
                     var =(
-                        student[0], student[1], student[2], 
+                        student[0], student[1], student[2],
                         student[3], student[4], student[5], 
-                        unit, student[7], time_slot.day, time_slot.hour
+                        unit, student[7], time_slot.day + 1, 
+                        time_slot.hour + HOUR_START, time_slot.hour + HOUR_START + 1
                         )
                     self.student_and_time_slots_assignments[
                         var] = self.model.NewBoolVar(str(var))
@@ -80,7 +81,8 @@ class Scheduler:
                         (
                             student[0], student[1], student[2],
                             student[3], student[4], student[5], 
-                            unit, student[7], time_slot.day, time_slot.hour
+                            unit, student[7], time_slot.day + 1, 
+                            time_slot.hour + HOUR_START, time_slot.hour + HOUR_START + 1
                         ), 0)for time_slot in self.time_slots) == 1)
 
         # Ensure that each time slot is occupied by at most one course unit.
@@ -88,11 +90,11 @@ class Scheduler:
             self.model.Add(
                 sum(self.student_and_time_slots_assignments.get(
                     (
-                        student[0], student[1], student[2], 
+                        student[0], student[1], student[2],
                         student[3], student[4], student[5], 
-                        unit, student[7], time_slot.day, time_slot.hour
-                        ), 0)
-                    for student in self.students_variable for unit in range(1, int(student[6]) + 1)) <= 1)
+                        unit, student[7], time_slot.day + 1, 
+                        time_slot.hour + HOUR_START, time_slot.hour + HOUR_START + 1
+                    ), 0)for student in self.students_variable for unit in range(1, int(student[6]) + 1)) <= 1)
 
     def declare_room_and_student_assignments(self):
         # Room and student assignment
@@ -159,63 +161,66 @@ class Scheduler:
             )
 
     def solve(self):
-        # Objective: Minimize the total number of assigned variables (to improve schedule efficiency)
+        # Objective: Minimize the total number of assigned variables to improve schedule efficiency
         self.model.Minimize(
             sum(
-                self.student_and_time_slots_assignments[student_time_slot]
-                for student_time_slot in self.student_and_time_slots_assignments
+                self.student_and_time_slots_assignments[student]
+                for student in self.student_and_time_slots_assignments
             )
         )
 
         # Solve the model
-        self.solver.Solve(self.model)
+        status = self.solver.Solve(self.model)
+        print("Status: ", status)
 
-        # Print the schedule
-        print("Schedule:")
-        for student_time_slot, variable in self.student_and_time_slots_assignments.items():
-            if self.solver.Value(variable) == 1:
-                student_info = (
-                    student_time_slot[0],
-                    student_time_slot[1],
-                    student_time_slot[2],
-                    student_time_slot[3],
-                    student_time_slot[4],
-                    student_time_slot[5],
-                    student_time_slot[6],
-                    student_time_slot[7],
-                )
-                time_slot_info = (
-                    student_time_slot[8],
-                    student_time_slot[9],
-                )
+        if status == cp_model.OPTIMAL:
+            # Print assignments
+            print("\nAssignments:")
+            for student in self.student_and_time_slots_assignments:
+                for room in self.room_and_student_assignments:
+                        for teacher in self.teacher_and_student_assignments:
+                            if room[:6] == teacher[:6] == student[:6]:
+                                if (
+                                    self.solver.Value(self.student_and_time_slots_assignments[student]) == 1 and
+                                    self.solver.Value(self.room_and_student_assignments[room]) == 1 and
+                                    self.solver.Value(self.teacher_and_student_assignments[teacher]) == 1
+                                ):
+                                    program = student[0]
+                                    year = student[1]
+                                    semester = student[2]
+                                    block = student[3]
+                                    course_code = student[4]
+                                    course_description = student[5]
+                                    course_unit = student[6]
+                                    course_type = student[7]
+                                    day = student[8]
+                                    time_in = student[9]
+                                    time_out = student[10]
+                                    room_name = room[-2]
+                                    teacher_name = teacher[-2]
 
-                # Fetch room and teacher info from existing dictionaries
-                room_info = None
-                for room_student_key, room_var in self.room_and_student_assignments.items():
-                    if self.solver.Value(room_var) == 1 and room_student_key[:-2] == student_info:
-                        room_info = (room_student_key[-2], room_student_key[-1])
-                        break
+                                    print(
+                                        str(program),
+                                        str(year),
+                                        str(semester),
+                                        str(block),
+                                        str(course_code),
+                                        str(course_description),
+                                        str(course_unit),
+                                        str(course_type),
+                                        str(day),
+                                        str(time_in),
+                                        str(time_out),
+                                        str(room_name),
+                                        str(teacher_name),
+                                    )
 
-                teacher_info = None
-                for teacher_student_key, teacher_var in self.teacher_and_student_assignments.items():
-                    if self.solver.Value(teacher_var) == 1 and teacher_student_key[:-2] == student_info:
-                        teacher_info = (teacher_student_key[-2], teacher_student_key[-1])
-                        break
 
-                # Handle cases where room or teacher info is not found
-                room_info_str = f"Room: {room_info[0]}, Room Type: {room_info[1]}, " if room_info else "Room: N/A, Room Type: N/A, "
-                teacher_info_str = f"Teacher: {teacher_info[0]}, Specialized: {teacher_info[1]}" if teacher_info else "Teacher: N/A, Specialized: N/A"
+        
+        else:
+            print("No optimal solution found.")                             
 
-                print(
-                    f"Program: {student_info[0]}, Year: {student_info[1]}, Semester: {student_info[2]}, "
-                    f"Block: {student_info[3]}, Course Code: {student_info[4]}, "
-                    f"Course Description: {student_info[5]}, Course Units: {student_info[6]}, "
-                    f"Course Type: {student_info[7]}, "
-                    f"Day {time_slot_info[0] + 1}, "
-                    f"Hour {time_slot_info[1] + HOUR_START}:00 - {time_slot_info[1] + HOUR_START + 1}:00, "
-                    f"{room_info_str}"
-                    f"{teacher_info_str}"
-                )
+
 
 if __name__ == "__main__":
     # Load data from data.py
