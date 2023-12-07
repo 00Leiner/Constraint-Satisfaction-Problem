@@ -8,6 +8,46 @@ HOUR_START = 7
 
 TimeSlot = namedtuple('TimeSlot', ['day', 'hour'])
 
+class ScheduleSolutionPrinter(cp_model.CpSolverSolutionCallback):
+    def __init__(self, solver, students_variable, room_and_student_assignments, teacher_and_student_assignments, room_and_time_slots_assignments):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self.solver = solver
+        self.students_variable = students_variable
+        self.room_and_student_assignments = room_and_student_assignments
+        self.teacher_and_student_assignments = teacher_and_student_assignments
+        self.room_and_time_slots_assignments = room_and_time_slots_assignments
+        self.solutions = []
+
+    def on_solution_callback(self):
+        current_solution = []
+        for student in self.students_variable:
+            for room in self.room_and_student_assignments:
+                for teacher in self.teacher_and_student_assignments:
+                    if room[:6] == teacher[:6] == student[:6]:
+                        if (
+                            self.solver.Value(self.room_and_student_assignments[room]) == 1 and
+                            self.solver.Value(self.teacher_and_student_assignments[teacher]) == 1
+                        ):
+                            current_solution.append({
+                                'program': student[0],
+                                'year': student[1],
+                                'semester': student[2],
+                                'block': student[3],
+                                'course_code': student[4],
+                                'course_description': student[5],
+                                'course_unit': student[6],
+                                'course_type': student[7],
+                                'day': student[8],
+                                'time_in': student[9],
+                                'time_out': student[10],
+                                'room_name': room[-2],
+                                'teacher_name': teacher[-2],
+                            })
+        self.solutions.append(current_solution)
+
+    def get_solutions(self):
+        return self.solutions
+
 class Scheduler:
     def __init__(self, rooms, students, teachers):
         #variable
@@ -147,28 +187,7 @@ class Scheduler:
                 var = (room + (time_slot.day, time_slot.hour))
                 self.room_and_time_slots_assignments[var] = self.model.NewBoolVar(str(var))
 
-        # Ensure room has time slot and no overlopping
-        for room in self.rooms_variable: 
-            self.model.Add(
-                sum(self.room_and_time_slots_assignments.get(
-                        ( room + (time_slot.day, time_slot.hour)), 0)for time_slot in self.time_slots) == 1
-            )
-        # Ensure room schedule once
-        for time_slot in self.time_slots: 
-            self.model.Add(
-                sum(self.room_and_time_slots_assignments.get(
-                        ( room + (time_slot.day, time_slot.hour)), 0)for room in self.rooms_variable) <= 1
-            )
-
     def solve(self):
-        # Objective: Minimize the total number of assigned variables to improve schedule efficiency
-        self.model.Minimize(
-            sum(
-                self.student_and_time_slots_assignments[student]
-                for student in self.student_and_time_slots_assignments
-            )
-        )
-
         # Solve the model
         status = self.solver.Solve(self.model)
         print("Status: ", status)

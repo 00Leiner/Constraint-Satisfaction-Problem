@@ -1,120 +1,186 @@
 from ortools.sat.python import cp_model
+from collections import namedtuple
+
+# Constants
+DAYS = 1
+HOURS_PER_DAY = 12
+HOUR_START = 7
+
+TimeSlot = namedtuple('TimeSlot', ['day', 'hour'])
 
 class Scheduler:
-    def __init__(self, rooms, students, teachers, days, time_slots):
+    def __init__(self, rooms, students, teachers):
+        # Constants for time slots and days.
+        self.time_slots = [TimeSlot(day, hour) for day in range(DAYS) for hour in range(HOURS_PER_DAY)]
+        # variables
         self.rooms = rooms
         self.students = students
         self.teachers = teachers
-        self.days = days
-        self.time_slots = time_slots
-
+        # CP-SAT
         self.model = cp_model.CpModel()
         self.solver = cp_model.CpSolver()
-
-        # set up variables
-        self.rooms_variable = self.define_rooms_variable()
-        self.teachers_variable = self.define_teachers_variable()
-        self.students_variable = self.define_students_variable()
-
-        # Dictionary to store values
-        self.room_assignments = {}  
-        self.teacher_assignments = {}  
-
+        # Dictionaries to store values
+        self.room_availability = {} 
+        self.student_and_room_assignment = {}
+        self.teacher_and_room_assignment = {}
+        self.teacher_and_student_assignment = {}
         # Populate variables based on data
-        self.declare_room_assignments()
-        self.declare_teacher_assignments()
+        self.define_room_availability()
+        self.define_student_and_room_assignment()
+        self.define_teacher_and_room_assignment()
+        self.define_teacher_and_student_assignment()
 
-        # Define constraints and solve the model
-        self.define_constraints()
+        self.add_constraints()
 
-        #solve
         self.solve()
 
-    def define_rooms_variable(self):
-        return {(room['name'], room['type']): self.model.NewBoolVar(f"{room['name']}, {room['type']}") for room in self.rooms}
+    def define_room_availability(self):
+        for room in self.rooms:
+            for time_slot in self.time_slots:
+                var = (room['name'], room['type'], time_slot.day, time_slot.hour)
+                self.room_availability[var] = self.model.NewBoolVar(str(var))
 
-    def define_teachers_variable(self):
-        return {(teacher['name'], teacher['specialized']): self.model.NewBoolVar(f"{teacher['name']}, {teacher['specialized']}") for teacher in self.teachers}
-
-    def define_students_variable(self):
-        students_variable = {}
+    def define_student_and_room_assignment(self):
         for student in self.students:
             for course in student['courses']:
-                assign = (student['program'], student['year'], student['semester'], student['block'],
-                          course['code'], course['description'], course['units'], course['type'])
-                students_variable[assign] = self.model.NewBoolVar(str(assign))
-        return students_variable
+                for unit in range(1, int(course['units']) + 1):
+                    for room_availability in self.room_availability:
+                        if course['type'] == room_availability[1]:
+                            var = (student['program'], student['year'], student['semester'],
+                                   student['block'], course['code'], unit, room_availability[0], 
+                                   room_availability[2] + 1, room_availability[3] + HOUR_START, 
+                                   room_availability[3] + HOUR_START + 1)
+                            self.student_and_room_assignment[var] = self.model.NewBoolVar(str(var))
 
-    def declare_room_assignments(self):
-        for room in self.rooms_variable:
-            for assign in self.students_variable:
-                if room[1] == assign[7]:
-                    self.room_assignments[(assign + (room[0], room[1]))] = self.model.NewBoolVar(str(assign))
+    def define_teacher_and_room_assignment(self):
+        for teacher in self.teachers:
+            specialized_list = teacher.get('specialized', [])
+            if isinstance(specialized_list, dict):
+                specialized_list = [specialized_list]
+            for specialized in specialized_list:
+                for unit in range(1, int(specialized['units']) + 1):    
+                    for room_availability in self.room_availability:
+                        if specialized['type'] == room_availability[1]:
+                            var = (teacher['name'], specialized['code'], unit, room_availability[0], 
+                                    room_availability[2] + 1, room_availability[3] + HOUR_START, 
+                                    room_availability[3] + HOUR_START + 1)
+                            self.teacher_and_room_assignment[var] = self.model.NewBoolVar(str(var))
+                            
+    def define_teacher_and_student_assignment(self):
+        for student in self.students:
+            for course in student['courses']:
+                for teacher in self.teachers:
+                    specialized_list = teacher.get('specialized', [])
+                    if isinstance(specialized_list, dict):
+                        specialized_list = [specialized_list]
+                    for specialized in specialized_list:
+                        if course['code'] == specialized['code']:
+                            var = (student['program'], student['year'], student['semester'],
+                                   student['block'], course['code'], teacher['name'])
+                            self.teacher_and_student_assignment[var] = self.model.NewBoolVar(str(var))
 
-    def declare_teacher_assignments(self):
-        for teacher in self.teachers_variable:
-            for assign in self.students_variable:
-                if teacher[1] == assign[4]:  
-                    self.teacher_assignments[(
-                        assign + (teacher[0], teacher[1]))] = self.model.NewBoolVar(str(assign))
+    def add_constraints(self):
+        # Ensure that each room is not assigned to multiple classes at the same time
+        for room in self.rooms:
+            for time_slot in self.time_slots:
+                overlapping_assignments = [
+                    self.student_and_room_assignment[(
+                        student['program'], student['year'], student['semester'],
+                        student['block'], course['code'], unit, room['name'],
+                        time_slot.day, time_slot.hour, time_slot.hour + 1)
+                    ] for student in self.students for course in student['courses'] for unit in range(1, int(course['units']) + 1) if course['type'] == room['type']
+                ] + [
+                    self.teacher_and_room_assignment[(
+                        teacher['name'], specialized['code'], unit, room['name'],
+                        time_slot.day, time_slot.hour, time_slot.hour + 1)
+                    ] for teacher in self.teachers for specialized_list in [teacher.get('specialized', [])] if isinstance(specialized_list, list) for specialized in specialized_list for unit in range(1, int(specialized['units']) + 1) if specialized['type'] == room['type']
+                ]
+                self.model.Add(sum(overlapping_assignments) <= 1)
 
-    def define_constraints(self):
-        # Each student is assigned to exactly one room
-        for student in self.students_variable:
-            self.model.Add(
-                sum(self.room_assignments.get(
-                    student + (room[0], room[1]), 0) for room in self.rooms_variable) == 1
-            )
+        # Ensure that each student is not assigned to multiple classes at the same time
+        for student in self.students:
+            for time_slot in self.time_slots:
+                overlapping_assignments = [
+                    self.student_and_room_assignment[(
+                        student['program'], student['year'], student['semester'],
+                        student['block'], course['code'], unit, room['name'],
+                        time_slot.day, time_slot.hour, time_slot.hour + 1)
+                    ] for course in student['courses'] for unit in range(1, int(course['units']) + 1) for room in self.rooms if course['type'] == room['type']
+                ] + [
+                    self.teacher_and_student_assignment[(
+                        student['program'], student['year'], student['semester'],
+                        student['block'], course['code'], teacher['name'])
+                    ] for course in student['courses'] for teacher in self.teachers for specialized_list in [teacher.get('specialized', [])] if isinstance(specialized_list, list) for specialized in specialized_list if course['code'] == specialized['code']
+                ]
+                self.model.Add(sum(overlapping_assignments) <= 1)
 
-        # Each teacher is assigned to exactly one student
-        for teacher in self.teachers_variable:
-            self.model.Add(
-                sum(self.teacher_assignments.get(
-                        (student + (teacher[0], teacher[1])), 0)for student in self.students_variable) == 1
-            )
-
+        # Ensure that each teacher is not assigned to multiple classes at the same time
+        for teacher in self.teachers:
+            for time_slot in self.time_slots:
+                overlapping_assignments = [
+                    self.teacher_and_room_assignment[(
+                        teacher['name'], specialized['code'], unit, room['name'],
+                        time_slot.day, time_slot.hour, time_slot.hour + 1)
+                    ] for specialized_list in [teacher.get('specialized', [])] if isinstance(specialized_list, list) for specialized in specialized_list for unit in range(1, int(specialized['units']) + 1) for room in self.rooms if specialized['type'] == room['type']
+                ] + [
+                    self.teacher_and_student_assignment[(
+                        student['program'], student['year'], student['semester'],
+                        student['block'], course['code'], teacher['name'])
+                    ] for student in self.students for course in student['courses'] for specialized_list in [teacher.get('specialized', [])] if isinstance(specialized_list, list) for specialized in specialized_list if course['code'] == specialized['code']
+                ]
+                self.model.Add(sum(overlapping_assignments) <= 1)
+    
     def solve(self):
-        # Objective: Maximize the total number of student-teacher-room assignments
-        objective = sum(self.room_assignments.values()) + sum(self.teacher_assignments.values())
-        self.model.Maximize(objective)
-
         # Solve the model
         status = self.solver.Solve(self.model)
         print("Status: ", status)
 
         if status == cp_model.OPTIMAL:
-
             # Print assignments
             print("\nAssignments:")
-            for room in self.room_assignments:
-                for teacher in self.teacher_assignments:
-                        if room[:8] == teacher[:8]:
-                            if (
-                                self.solver.Value(self.room_assignments[room]) == 1 and
-                                self.solver.Value(self.teacher_assignments[teacher]) == 1
-                            ):
-                                print(
-                                str(room[0]),
-                                str(room[1]),
-                                str(room[2]),
-                                str(room[3]),
-                                str(room[4]),
-                                str(room[5]),
-                                str(room[6]),
-                                str(room[7]),
-                                str(room[8]),
-                                str(room[9]),
-                                str(teacher[-2]),
-                                str(teacher[-1])
-                            )
+            for student in self.student_and_room_assignment:
+                for room in self.teacher_and_room_assignment:
+                        for teacher in self.teacher_and_student_assignment:
+                            if teacher[:4] == student[:4]:
+                                if student[4] == room[1] == teacher[4]:
+                                    if student[:-5] == room[:-5]:
+                                        if (
+                                            self.solver.Value(self.student_and_room_assignment[student]) == 1 and
+                                            self.solver.Value(self.teacher_and_room_assignment[room]) == 1 and
+                                            self.solver.Value(self.teacher_and_student_assignment[teacher]) == 1
+                                        ):
+                                            program = student[0]
+                                            year = student[1]
+                                            semester = student[2]
+                                            block = student[3]
+                                            course_code = student[4]
+                                            course_unit = student[5]
+                                            day = student[7]
+                                            time_in = student[8]
+                                            time_out = student[9]
+                                            room_name = student[6]
+                                            teacher_name = teacher[-1]
 
+                                            print(
+                                                str(program),
+                                                str(year),
+                                                str(semester),
+                                                str(block),
+                                                str(course_code),
+                                                str(course_unit),
+                                                str(day),
+                                                str(time_in),
+                                                str(time_out),
+                                                str(room_name),
+                                                str(teacher_name),
+                                            )
+        
         else:
-            print("No optimal solution found.")
+            print("No optimal solution found.")  
+    
 
 if __name__ == "__main__":
     # Load data from data.py
     from data import rooms, teachers, students
-    days = ["Mon", "Tue", "Thu", "Fri", "Sat"]
-    time_slots = range(7, 20)
 
-    scheduler = Scheduler(rooms, students, teachers, days, time_slots)
+    scheduler = Scheduler(rooms, students, teachers)

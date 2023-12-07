@@ -16,12 +16,29 @@ teachers = [
                 'units': "3",
                 'type': "lab",
             }
+    },
+    {
+        'name': "Dr. Williams",
+        'specialized': {
+                'code': "IT 3205",
+                'description': "Web Development",
+                'units': "3",
+                'type': "lec",
+            },
+    },
+    {
+        'name': "Prof. Davis",
+        'specialized': {
+                'code': "IT 3206",
+                'description': "Database Management",
+                'units': "3",
+                'type': "lab",
+            },
     }
 ]
 
 students = [
     {
-        
         'program': "BSCS",
         'year': "2",
         'semester': "1",
@@ -40,6 +57,26 @@ students = [
                 'type': "lab",
             }
         ]
+    },
+    {
+        'program': "BSIT",
+        'year': "3",
+        'semester': "2",
+        'block': "A",
+        'courses': [
+            {
+                'code': "IT 3205",
+                'description': "Web Development",
+                'units': "3",
+                'type': "lec",
+            },
+            {
+                'code': "IT 3206",
+                'description': "Database Management",
+                'units': "3",
+                'type': "lab",
+            }
+        ]
     }
 ]
 
@@ -50,6 +87,14 @@ rooms = [
     },
     {
         'name': "Classroom A",
+        'type': "lec",
+    },
+    {
+        'name': "Classroom 2",
+        'type': "lab",
+    },
+    {
+        'name': "Classroom B",
         'type': "lec",
     }
 ]
