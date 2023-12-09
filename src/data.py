@@ -1,21 +1,11 @@
 teachers = [
     {
         'name': "Dr. Smith",
-        'specialized': {
-                'code': "CS 2101",
-                'description': "Introduction to Computer Science",
-                'units': "3",
-                'type': "lec",
-            },
+        'specialized': "CS 2101"
     },
     {
         'name': "Prof. Johnson",
-        'specialized': {
-                'code': "CS 2102",
-                'description': "Programming Fundamentals",
-                'units': "3",
-                'type': "lab",
-            }
+        'specialized': "CS 2102"
     }
 ]
 
@@ -36,6 +26,26 @@ students = [
             {
                 'code': "CS 2102",
                 'description': "Programming Fundamentals",
+                'units': "3",
+                'type': "lab",
+            }
+        ]
+    },
+    {
+        'program': "BSIT",
+        'year': "3",
+        'semester': "2",
+        'block': "A",
+        'courses': [
+            {
+                'code': "IT 3205",
+                'description': "Web Development",
+                'units': "3",
+                'type': "lec",
+            },
+            {
+                'code': "IT 3206",
+                'description': "Database Management",
                 'units': "3",
                 'type': "lab",
             }

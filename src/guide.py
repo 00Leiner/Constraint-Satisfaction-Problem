@@ -125,17 +125,6 @@ class Scheduler:
                             time_slot.hour + HOUR_START, time_slot.hour + HOUR_START + 1
                         ), 0)for time_slot in self.time_slots) == 1)
 
-        # Ensure that each time slot is occupied by at most one course unit.
-        for time_slot in self.time_slots:
-            self.model.Add(
-                sum(self.student_and_time_slots_assignments.get(
-                    (
-                        student[0], student[1], student[2],
-                        student[3], student[4], student[5], 
-                        unit, student[7], time_slot.day + 1, 
-                        time_slot.hour + HOUR_START, time_slot.hour + HOUR_START + 1
-                    ), 0)for student in self.students_variable for unit in range(1, int(student[6]) + 1)) <= 1)
-
     def declare_room_and_student_assignments(self):
         # Room and student assignment
         for room in self.rooms_variable:
@@ -151,13 +140,6 @@ class Scheduler:
                     student + (room[0], room[1]), 0) for room in self.rooms_variable) == 1
             )
 
-        # Each student is assigned to exactly one room
-        for room in self.rooms_variable:
-            self.model.Add(
-                sum(self.room_and_student_assignments.get(
-                    student + (room[0], room[1]), 0) for student in self.students_variable) <= 1
-            )
-
     def declare_teacher_and_student_assignments(self):
         # Teacher and Student assignment
         for teacher in self.teachers_variable:
@@ -171,13 +153,6 @@ class Scheduler:
             self.model.Add(
                 sum(self.teacher_and_student_assignments.get(
                         (student + (teacher[0], teacher[1])), 0)for student in self.students_variable) == 1
-            )
-
-        # Each student is assigned to exactly one teacher
-        for student in self.students_variable:
-            self.model.Add(
-                sum(self.teacher_and_student_assignments.get(
-                        (student + (teacher[0], teacher[1])), 0)for teacher in self.teachers_variable) <= 1
             )
 
     def declare_room_and_time_slots_assignments(self):

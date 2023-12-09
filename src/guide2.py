@@ -2,7 +2,7 @@ from ortools.sat.python import cp_model
 from collections import namedtuple
 
 # Constants
-DAYS = 5
+DAYS = 1
 HOURS_PER_DAY = 12
 HOUR_START = 7
 
