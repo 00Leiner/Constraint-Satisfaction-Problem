@@ -1,52 +1,66 @@
 from ortools.sat.python import cp_model
 
-def solve_scheduling_problem():
+class ScheduleSolutionPrinter(cp_model.CpSolverSolutionCallback):
+    def __init__(self, working, worker_names, max_solutions):
+        cp_model.CpSolverSolutionCallback.__init__(self)
+        self.working = working
+        self.worker_names = worker_names
+        self.solutions = []
+        self.solution_count = 0
+        self.max_solutions = max_solutions
+
+    def on_solution_callback(self):
+        current_solution = []
+        for worker in range(len(self.working)):
+            for day in range(len(self.working[worker])):
+                current_solution.append((self.worker_names[worker], day + 1, 'Working' if self.Value(self.working[worker][day]) else 'Resting'))
+        self.solutions.append(current_solution)
+        self.solution_count += 1
+
+        if self.solution_count >= self.max_solutions:
+            self.StopSearch()
+
+    def get_solutions(self):
+        return self.solutions
+
+def create_worker_schedule(max_solutions=3):
     model = cp_model.CpModel()
 
-    # Define parameters
-    num_students = 10
-    days_in_week = 5
-    available_time_range = range(7, 20)  # 7am to 7pm
-    max_continuous_hours = 3
-    rest_duration = 2
+    # Number of days in a week
+    num_days = 7
 
-    # Variables
-    schedule = {}
-    for student in range(num_students):
-        for day in range(days_in_week):
-            for time_slot in available_time_range:
-                schedule[(student, day, time_slot)] = model.NewBoolVar(f'st_{student}_day_{day}_time_{time_slot}')
+    # Number of working days for each worker
+    work_days_per_week = 3
 
-    # Constraints
-    # Add constraints to ensure 5 days or less
-    for student in range(num_students):
-        model.Add(sum(schedule[(student, day, time_slot)] for day in range(days_in_week) for time_slot in available_time_range) <= 5)
+    # Worker names
+    worker_names = ['john', 'mark']
 
-    # Add constraints to ensure rest of 2 days
-    for student in range(num_students):
-        for day in range(days_in_week - rest_duration):
-            model.Add(sum(schedule[(student, day + rest_day, time_slot)] for rest_day in range(rest_duration + 1) for time_slot in available_time_range) == 0)
+    # Create variables for each day indicating whether each worker is working on that day
+    working = [[model.NewBoolVar(
+        f'working_{worker}_{day}'
+        ) for day in range(num_days)] for worker in worker_names]
 
-    # Add constraints for maximum continuous learning hours
-    for student in range(num_students):
-        for day in range(days_in_week):
-            for time_slot in range(len(available_time_range) - max_continuous_hours + 1):
-                model.Add(sum(schedule.get((student, day, time_slot + i), 0) for i in range(max_continuous_hours)) <= 3)
+    # Each worker should work for 3 days in a week
+    for worker in range(len(worker_names)):
+        model.Add(sum(working[worker]) == work_days_per_week)
 
+    # Workers should have non-overlapping schedules
+    for day in range(num_days):
+        model.Add(sum(working[worker][day] for worker in range(len(worker_names))) <= 1)
 
-    # Solve the model
+    # Create a solution printer to collect and print solutions
+    solution_printer = ScheduleSolutionPrinter(working, worker_names, max_solutions)
     solver = cp_model.CpSolver()
-    status = solver.Solve(model)
 
-    if status == cp_model.OPTIMAL:
-        # Retrieve the solution
-        for student in range(num_students):
-            for day in range(days_in_week):
-                for time_slot in available_time_range:
-                    if solver.Value(schedule[(student, day, time_slot)]) == 1:
-                        print(f"Student {student} is scheduled on Day {day} at Time {time_slot}")
-    else:
-        print("No feasible solution found.")
+    # Solve the model and print solutions
+    solver.SearchForAllSolutions(model, solution_printer)
+
+    # Print all solutions
+    all_solutions = solution_printer.get_solutions()
+    for i, solution in enumerate(all_solutions):
+        print(f"Solution {i + 1}:")
+        for worker, day, status in solution:
+            print(f"Worker {worker}: Day {day}: {status}")
 
 if __name__ == "__main__":
-    solve_scheduling_problem()
+    create_worker_schedule()
