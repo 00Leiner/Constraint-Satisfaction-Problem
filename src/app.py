@@ -1,17 +1,13 @@
 from ortools.sat.python import cp_model
-from collections import namedtuple
 
 # Constants
-DAYS = 1
-HOURS_PER_DAY = 12
+DAYS = 7
+HOURS_PER_DAY = 1
 HOUR_START = 7
 
-TimeSlot = namedtuple('TimeSlot', ['day', 'hour'])
 
 class Scheduler:
     def __init__(self, rooms, students, teachers):
-        # Constants for time slots and days.
-        self.time_slots = [TimeSlot(day, hour) for day in range(DAYS) for hour in range(HOURS_PER_DAY)]
         # variables
         self.rooms = rooms
         self.students = students
@@ -24,10 +20,9 @@ class Scheduler:
         self.student_time_slots = {}  # student schedule constraints
 
         self.define_room_availability()
-        self.define_student_time_slots()
-
-        self.print_schedule()
-
+        self.define_student_constraints()
+        
+        #self.print_schedule()
     def define_room_availability(self):
         for room in self.rooms:
             for day in range(DAYS):
@@ -42,32 +37,36 @@ class Scheduler:
                     room['name'], day, hour
                 )] for day in range(DAYS) for hour in range(HOURS_PER_DAY)) == 1)
 
-    def define_student_time_slots(self):
-        continues_learning = 3
-        break_after_continuous_learning = 1  # You can adjust this based on your break duration
-
+    def define_student_constraints(self):
         for student in self.students:
-            self.student_time_slots[student['program']] = [
-                self.model.NewBoolVar(f"Student_{student['program']}_Room{room[-2]}_Hour{room[-1]}")
-                for room in self.room_availability
+            program = student['program']
+            for room_available in self.room_availability:
+                var = (program, room_available[0], room_available[1], room_available[2])
+                self.student_time_slots[var] = self.model.NewBoolVar(str(var))
+
+        for room_available in self.room_availability:
+            overlapping_students = [
+                self.student_time_slots[(student['program'], room_available[0], room_available[1], room_available[2])]
+                for student in self.students
             ]
+            self.model.Add(sum(overlapping_students) == 1)
 
-            for i, room in enumerate(self.room_availability):
-                if i % (continues_learning + break_after_continuous_learning) < continues_learning:
-                    self.model.Add(self.student_time_slots[student['program']][i] == 1)
-                else:
-                    self.model.Add(self.student_time_slots[student['program']][i] == 0)
-
+        
+        
     def print_schedule(self):
         status = self.solver.Solve(self.model)
 
         if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
             for student_program, time_slots in self.student_time_slots.items():
-                for i, room in enumerate(self.room_availability.items()):
-                    if self.solver.Value(time_slots[i]):
+                for i, var in enumerate(time_slots):
+                    if self.solver.Value(var):
+                        day, hour = divmod(i, HOURS_PER_DAY)
+                        room_index = i % len(self.rooms)
+                        room_name = self.rooms[room_index]['name']
                         print(
                             f"Student Program: {student_program}, "
-                            f"Room: {room[-2]}, Hour: {room[-1]}"
+                            f"Room: {room_name}, "
+                            f"Day: {day}, Hour: {hour + HOUR_START}"
                         )
         else:
             print('No solution found.')

@@ -57,9 +57,5 @@ rooms = [
     {
         'name': "Classroom 1",
         'type': "lab",
-    },
-    {
-        'name': "Classroom A",
-        'type': "lec",
     }
 ]

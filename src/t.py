@@ -33,7 +33,7 @@ def create_worker_schedule(max_solutions=3):
 
     # Create variables for each day indicating whether each worker is working on that day
     working = [[model.NewBoolVar(f'working_{worker}_{day}') for day in range(num_days)] for worker in range(2)]
-
+    print(working)
     # Each worker should work for 3 days in a week
     for worker in range(2):
         model.Add(sum(working[worker]) == work_days_per_week)
