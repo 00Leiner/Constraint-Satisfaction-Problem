@@ -14,7 +14,7 @@ teachers = [
                 'code': "CS 2102",
                 'description': "Programming Fundamentals",
                 'units': "3",
-                'type': "lab",
+                'type': "lec",
             }]
     }
 ]
@@ -37,7 +37,7 @@ students = [
                 'code': "CS 2102",
                 'description': "Programming Fundamentals",
                 'units': "3",
-                'type': "lab",
+                'type': "lec",
             }
         ]
     }

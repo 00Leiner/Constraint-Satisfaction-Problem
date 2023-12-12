@@ -1,27 +1,5 @@
 from ortools.sat.python import cp_model
 
-class ScheduleSolutionPrinter(cp_model.CpSolverSolutionCallback):
-    def __init__(self, working, resting, max_solutions):
-        cp_model.CpSolverSolutionCallback.__init__(self)
-        self.working = working
-        self.resting = resting
-        self.solutions = []
-        self.solution_count = 0
-        self.max_solutions = max_solutions
-
-    def on_solution_callback(self):
-        current_solution = []
-        for day in range(len(self.working)):
-            current_solution.append((day + 1, 'Working' if self.Value(self.working[day]) else 'Resting'))
-        self.solutions.append(current_solution)
-        self.solution_count += 1
-
-        if self.solution_count >= self.max_solutions:
-            self.StopSearch()
-
-    def get_solutions(self):
-        return self.solutions
-
 def create_worker_schedule():
     model = cp_model.CpModel()
 
@@ -47,22 +25,18 @@ def create_worker_schedule():
     # The worker should have 2 days of rest in a week
     model.Add(sum(resting) == 2)
 
-    # Limit the number of solutions to 3
-    max_solutions = 3
-
-    # Create a solution collector
-    solution_printer = ScheduleSolutionPrinter(working, resting, max_solutions)
-
     # Create a solver and solve the model
     solver = cp_model.CpSolver()
-    solver.SearchForAllSolutions(model, solution_printer)
+    status = solver.Solve(model)
 
-    # Print all solutions
-    for solution in solution_printer.get_solutions():
-        print("Solution:")
-        for day, status in solution:
-            print(f"Day {day}: {status}")
-        print()
+    # Print the schedule without showing resting days
+    if status == cp_model.OPTIMAL:
+        print("Optimal Schedule:")
+        for day in range(num_days):
+            if solver.Value(working[day]):
+                print(f"Day {day + 1}: Working")
+    else:
+        print("No solution found.")
 
 if __name__ == "__main__":
     create_worker_schedule()
