@@ -118,9 +118,7 @@ class Scheduler:
                                         )
                                         self.model.Add(
                                             self.X[s['program'], c['code'], d, h, r['name'], t['name']] == rest[h]
-                                        )
-
-    
+                                        )   
 
 class SolutionPrinter(cp_model.CpSolverSolutionCallback):
     def __init__(self, scheduler, limit):
