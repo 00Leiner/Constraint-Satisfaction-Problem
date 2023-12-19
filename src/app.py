@@ -7,7 +7,7 @@ class Scheduler:
         self.rooms = rooms
         self.students = students
         self.teachers = teachers
-        self.days = range(0, 6)
+        self.days = range(1, 3)
         self.hours = range(7, 20)
         # Initialize the CP-SAT model
         self.model = cp_model.CpModel()
@@ -20,6 +20,7 @@ class Scheduler:
         self.unit_constraints()
         self.no_double_booking_rooms_availability()
         self.one_day_rest_constraints()
+        self.teacher_constraints()
 
     def binary_variable(self):
         for s in self.students:
@@ -68,57 +69,7 @@ class Scheduler:
                             for t in self.teachers
                             for specialized in t['specialized'] 
                             if c['code'] == specialized['code'] and r['type'] == c['type']) == 0)
-        # 1 day rest of teaching schedule
-        for t in self.teachers:
-            rest_day = random.choice(self.days)
-            self.model.Add(sum(self.X[
-                s['program'], c['code'], rest_day, h, r['name'], t['name']]
-                            for s in self.students
-                            for c in s['courses']
-                            for h in self.hours
-                            for r in self.rooms
-                            for specialized in t['specialized'] 
-                            if c['code'] == specialized['code'] and r['type'] == c['type']) == 0)    
-
-    def continue_learning_and_teaching(self):
-        for s in self.students:
-            for c in s['courses']:
-                for d in self.days:
-                    for r in self.rooms:
-                        for t in self.teachers:
-                            for specialized in t['specialized']:
-                                if c['code'] == specialized['code'] and r['type'] == c['type']:
-                                    classes = [
-                                        self.model.NewBoolVar(f'X_{s["program"]}_{c["code"]}_{d}_{h}_{r["name"]}_{t["name"]}') for h in self.hours
-                                    ]
-                                    rest = [
-                                        self.model.NewBoolVar(f'R_{s["program"]}_{c["code"]}_{d}_{h}_{r["name"]}_{t["name"]}') for h in self.hours
-                                    ]
-
-                                    for h in self.hours:
-                                        # Ensure the index is within the range of classes and rest
-                                        if h < len(self.hours) - 1:
-                                            # Constraint: Either class or rest is scheduled at each hour
-                                            self.model.Add(self.X[s['program'], c['code'], d, h, r['name'], t['name']] == classes[h])
-
-                                    # Constraint: No more than 3 hours of continuous learning
-                                    self.model.Add(sum(classes) <= 3)
-
-                                    # Constraint: Less than or equal to 3 continuous rest after learning
-                                    self.model.Add(sum(rest) <= 3)
-
-                                    # Constraint: At least 1 hour of rest before continuing learning
-                                    for i in range(len(self.hours) - 1):  # Two iterations for two consecutive pairs of hours
-                                        self.model.Add(rest[i] + rest[i + 1] >= 1)
-
-                                    # Impose a relationship between X and classes, rest
-                                    for h in self.hours[:-1]:
-                                        self.model.Add(
-                                            self.X[s['program'], c['code'], d, h, r['name'], t['name']] == classes[h]
-                                        )
-                                        self.model.Add(
-                                            self.X[s['program'], c['code'], d, h, r['name'], t['name']] == rest[h]
-                                        )   
+            
 
 class SolutionPrinter(cp_model.CpSolverSolutionCallback):
     def __init__(self, scheduler, limit):
@@ -147,7 +98,7 @@ if __name__ == "__main__":
     scheduler = Scheduler(rooms, students, teachers)
 
     # Create and set the solution callback with the desired limit
-    limit = 10  # Set the desired limit
+    limit = 1  # Set the desired limit
     solution_printer = SolutionPrinter(scheduler, limit)
     
     # Find solutions

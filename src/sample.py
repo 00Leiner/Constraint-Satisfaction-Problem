@@ -1,71 +1,43 @@
 from ortools.sat.python import cp_model
-from collections import namedtuple
 
-# Constants
-DAYS = 5
-HOURS_PER_DAY = 12
-HOUR_START = 7
-
-TimeSlot = namedtuple('TimeSlot', ['day', 'hour'])
-
-def schedule_courses(course_and_unit):
-    # Create the CP-SAT model.
+def create_string_assignment_model():
     model = cp_model.CpModel()
-    # Create a solver and solve the model.
+
+    # Constants
+    courses = ["Math", "Physics", "English", "History"]
+    rooms = ["Room A", "Room B", "Room C"]
+    teachers = ["Teacher X", "Teacher Y", "Teacher Z"]
+    days = ["Monday", "Tuesday", "Wednesday"]
+    
+    # Variables
+    course_to_room = [model.NewIntVar(0, len(rooms) - 1, f'{course}_to_{room}') for course in courses for room in rooms]
+    course_to_teacher = [model.NewIntVar(0, len(teachers) - 1, f'{course}_to_{teacher}') for course in courses for teacher in teachers]
+    course_to_day = [model.NewIntVar(0, len(days) - 1, f'{course}_to_{day}') for course in courses for day in days]
+
+    # Constraints: Each course is assigned to exactly one room, teacher, and day
+    for i, course in enumerate(courses):
+        model.Add(sum(course_to_room[i * len(rooms) + j] for j in range(len(rooms))) == 1)
+        model.Add(sum(course_to_teacher[i * len(teachers) + j] for j in range(len(teachers))) == 1)
+        model.Add(sum(course_to_day[i * len(days) + j] for j in range(len(days))) == 1)
+
+    # Additional constraints can be added based on your specific requirements
+
+    return model, course_to_room, course_to_teacher, course_to_day, courses, rooms, teachers, days
+
+def solve_string_assignment_problem():
+    model, course_to_room, course_to_teacher, course_to_day, courses, rooms, teachers, days = create_string_assignment_model()
     solver = cp_model.CpSolver()
+
     status = solver.Solve(model)
 
-    # Extract courses and units from the dictionary.
-    courses = list(course_and_unit.keys())
-
-    # Constants for time slots and days.
-    time_slots = [TimeSlot(day, hour) for day in range(DAYS) for hour in range(HOURS_PER_DAY)]
-    
-    # Define variables representing the schedule for each course unit.
-    course_schedule = {}
-    for course in courses:
-        for unit in range(1, int(course_and_unit[course]) + 1):
-            for time_slot in time_slots:
-                course_schedule[(course, unit, time_slot)] = model.NewBoolVar(f'schedule_{course}_{unit}_{time_slot.day}_{time_slot.hour}')
-
-    # Ensure that each course unit is scheduled exactly once.
-    for course in courses:
-        for unit in range(1, int(course_and_unit[course]) + 1):
-            model.Add(sum(course_schedule[(
-                course, unit, time_slot)
-                ] for time_slot in time_slots) == 1)
-
-    # Ensure that each time slot is occupied by at most one course unit.
-    for time_slot in time_slots:
-        model.Add(sum(course_schedule[(course, unit, time_slot)] for course in courses for unit in range(1, int(course_and_unit[course]) + 1)) <= 1)
-
-
-    # Print the solution.
     if status == cp_model.OPTIMAL:
-        for course in courses:
-            print(f"\n{course} Schedule:")
-            for unit in range(1, int(course_and_unit[course]) + 1):
-                print(f"\nSchedule for Unit {unit}:")
-                for time_slot in time_slots:
-                    if solver.Value(course_schedule[(course, unit, time_slot)]) == 1:
-                        print(f"Day {time_slot.day + 1}, Hour {time_slot.hour + HOUR_START}:00 - {time_slot.hour + HOUR_START + 1}:00")
+        for i, course in enumerate(courses):
+            assigned_room = rooms[solver.Value(course_to_room[i * len(rooms)])]
+            assigned_teacher = teachers[solver.Value(course_to_teacher[i * len(teachers)])]
+            assigned_day = days[solver.Value(course_to_day[i * len(days)])]
+            print(f'{course} is assigned to {assigned_room}, taught by {assigned_teacher}, on {assigned_day}')
     else:
-        print(f"No solution found. Solver status: {solver.StatusName(status)}")
+        print('No solution found.')
 
-# Example: Schedule courses with different units and durations.
-course_and_unit = {
-    'course1': '3',
-    'course2': '3',
-    'course3': '2',
-    'course4': '2',
-    'course5': '3',
-    'course6': '1',
-    'course7': '3',
-    'course8': '3',
-    'course9': '2',
-    'course10': '2',
-    'course11': '3',
-    'course12': '1'
-}
-
-schedule_courses(course_and_unit)
+if __name__ == "__main__":
+    solve_string_assignment_problem()
