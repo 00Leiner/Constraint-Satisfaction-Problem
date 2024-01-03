@@ -1,43 +1,55 @@
 from ortools.sat.python import cp_model
 
-def create_string_assignment_model():
-    model = cp_model.CpModel()
+# Data
+days = range(1, 6)  # 5 days a week (Monday to Friday)
+for i in days:
+    print(i)
+time_slots = [(day, start_time) for day in days for start_time in range(7, 19)]  # Time slots from 7:00 to 19:00
 
-    # Constants
-    courses = ["Math", "Physics", "English", "History"]
-    rooms = ["Room A", "Room B", "Room C"]
-    teachers = ["Teacher X", "Teacher Y", "Teacher Z"]
-    days = ["Monday", "Tuesday", "Wednesday"]
-    
-    # Variables
-    course_to_room = [model.NewIntVar(0, len(rooms) - 1, f'{course}_to_{room}') for course in courses for room in rooms]
-    course_to_teacher = [model.NewIntVar(0, len(teachers) - 1, f'{course}_to_{teacher}') for course in courses for teacher in teachers]
-    course_to_day = [model.NewIntVar(0, len(days) - 1, f'{course}_to_{day}') for course in courses for day in days]
+students = [
+    {
+        'id': "1",
+        'courses': [
+            {
+                'code': "CS 2101",
+                'units': 3,
+                'type': "lec",
+            }
+        ]
+    }
+]
 
-    # Constraints: Each course is assigned to exactly one room, teacher, and day
-    for i, course in enumerate(courses):
-        model.Add(sum(course_to_room[i * len(rooms) + j] for j in range(len(rooms))) == 1)
-        model.Add(sum(course_to_teacher[i * len(teachers) + j] for j in range(len(teachers))) == 1)
-        model.Add(sum(course_to_day[i * len(days) + j] for j in range(len(days))) == 1)
+# Initialize the CP-SAT solver
+model = cp_model.CpModel()
 
-    # Additional constraints can be added based on your specific requirements
+# Define Variables
+assignments = {}
+for student in students:
+    for course in student['courses']:
+        for day, start_time in time_slots:
+            var = model.NewBoolVar(f"student_{student['id']}_course_{course['code']}_day_{day}_start_{start_time}")
+            assignments[(student['id'], course['code'], day, start_time)] = var
 
-    return model, course_to_room, course_to_teacher, course_to_day, courses, rooms, teachers, days
+# Add Constraints
+for student in students:
+    for course in student['courses']:
 
-def solve_string_assignment_problem():
-    model, course_to_room, course_to_teacher, course_to_day, courses, rooms, teachers, days = create_string_assignment_model()
-    solver = cp_model.CpSolver()
+        for day in days:
+            model.Add(sum(assignments[(student['id'], course['code'], day, start_time)] for start_time in range(7, 19)) == course['units'])  # Ensure units match
+            
+# Solve the model
+solver = cp_model.CpSolver()
+status = solver.Solve(model)
 
-    status = solver.Solve(model)
-
-    if status == cp_model.OPTIMAL:
-        for i, course in enumerate(courses):
-            assigned_room = rooms[solver.Value(course_to_room[i * len(rooms)])]
-            assigned_teacher = teachers[solver.Value(course_to_teacher[i * len(teachers)])]
-            assigned_day = days[solver.Value(course_to_day[i * len(days)])]
-            print(f'{course} is assigned to {assigned_room}, taught by {assigned_teacher}, on {assigned_day}')
-    else:
-        print('No solution found.')
-
-if __name__ == "__main__":
-    solve_string_assignment_problem()
+# Process the result
+if status == cp_model.OPTIMAL:
+    for student in students:
+        for course in student['courses']:
+            print(f"Student ID: {student['id']}, Course: {course['code']}")
+            for day in days:
+                for start_time in range(7, 19):
+                    if solver.Value(assignments[(student['id'], course['code'], day, start_time)]) == 1:
+                        dismissal_time = start_time + 3  # Assuming 3 units = 3 hours
+                        print(f"Class Time: {start_time}:00, Dismissal Time: {dismissal_time}:00")
+else:
+    print("No feasible solution found.")
