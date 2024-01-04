@@ -8,14 +8,17 @@ def main():
     courses_units = {'Course A': 3, 'Course B': 2, 'Course C': 1}
     time_slots = [(7, 10), (10, 13), (13, 16), (16, 19), (19, 22), (22, 25)]
 
+    print(list(time_slots))
+
     course_time_slots = {}
     for course in courses_units:
         for unit in range(courses_units[course]):
             course_time_slots[(course, unit)] = cp_model_.NewIntVar(0, len(time_slots) - 1, f'{course}_unit_{unit}')
-
+    
     for course in courses_units:
         for unit in range(courses_units[course] - 1):
             cp_model_.Add(course_time_slots[(course, unit + 1)] == course_time_slots[(course, unit)] + 1)
+
 
     # Add non-overlapping constraints
     for course1 in courses_units:

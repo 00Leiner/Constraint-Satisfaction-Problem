@@ -21,6 +21,7 @@ def format_data(fetched_data):
 
     for teacher in fetched_data.get('teachers', []):
         teacher_info = {
+            '_id': teacher.get('_id', ''),
             'name': teacher.get('name', ''),
             'specialized': []
         }

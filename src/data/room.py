@@ -15,36 +15,23 @@ class Fetching:
             print(f"Error in GET request. Status code: {response.status_code}")
             print(response.text)
             return None
-
+        
 def format_data(fetched_data):
     formatted_data = []
 
-    for student in fetched_data.get('students', []):
-        program_info = {
-            'id': student.get('_id', ''),
-            'program': student.get('program', ''),
-            'year': student.get('year', ''),
-            'semester': student.get('semester', ''),
-            'block': student.get('block', ''),
-            'courses': []
+    for room in fetched_data.get('rooms', []):
+        room_info = {
+            '_id': room.get('_id', ''),
+            'name': room.get('name', ''),
+            'type': room.get('type', '')
         }
 
-        for course in student.get('courses', []):
-            course_info = {
-                'code': course.get('code', ''),
-                'description': course.get('description', ''),
-                'units': course.get('units', ''),
-                'type': course.get('type', '')
-            }
-
-            program_info['courses'].append(course_info)
-
-        formatted_data.append(program_info)
+        formatted_data.append(room_info)
 
     return formatted_data
 
-def fetch_student_data():
-    fetch_url = 'http://localhost:3000/Students/get'
+def fetch_room_data():
+    fetch_url = 'http://localhost:3000/Rooms/get'
     fetching_instance = Fetching(fetch_url)
     fetched_data = fetching_instance.perform_get_request()
 
@@ -54,4 +41,3 @@ def fetch_student_data():
     else:
         print('Failed to fetch data.')
         return None
-    
