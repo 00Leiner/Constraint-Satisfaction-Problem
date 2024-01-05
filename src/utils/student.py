@@ -1,11 +1,11 @@
 from data.course import fetch_course_data
 from data.student import fetch_student_data
 
-def define_student_course_assignments(model):
+def define_student_variable():
     courses = fetch_course_data()
     students = fetch_student_data()
 
-    student_course_assignment = {}
+    student_course_assignment = []
     # Create a binary decision variable for each student-course pair
     for student in students:
         student_id = student['_id']
@@ -23,6 +23,6 @@ def define_student_course_assignments(model):
                 # Check if the student prefers this course
                 if student_curr_code == course_code and student_curr_des == course_des:
                     # Create a binary decision variable
-                    student_course_assignment[(student_id, course_id)] = model.NewBoolVar(f'student:{student_id}_course:{course_id}')
-
+                    student_course_assignment.append((student_id, course_id))
+                    
     return student_course_assignment

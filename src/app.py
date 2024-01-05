@@ -1,8 +1,10 @@
 # Import necessary libraries
 from ortools.sat.python import cp_model
-from utils.student_course_assignment import define_student_course_assignments
-from utils.teacher_course_assignment import define_teacher_course_assignments
-from utils.room_availability import define_room_availability
+from utils.student import define_student_variable 
+from data.course import fetch_course_data
+from utils.teacher import define_teacher_variable
+from data.room import fetch_room_data
+from assignment.scheduling import define_scheduling
 
 # Function to create the scheduling model
 def create_scheduling_model():
@@ -10,12 +12,18 @@ def create_scheduling_model():
     model = cp_model.CpModel()
     
     # Define variables 
-    student_curriculumn = define_student_course_assignments(model) # {(student_id, course_id): assigned}
-    teacher_specialized = define_teacher_course_assignments(model)  # {(teacher_id, course_id): assigned}
-    room_availability = define_room_availability(model) # {(room_id, day, time_slots)}
-    teacher_time_slot_assignment = {}  # {teacher_id: time_slot_id}
-    student_time_slot_assignment = {}  # {student_id: time_slot_id}
-    teacher_student_assignment = {}  # {(teacher_id, student_id): assigned}
+    students = define_student_variable() #{(student_id, course_id), }
+    courses = fetch_course_data() #{ (_id, code, description, units, type) }
+    teachers = define_teacher_variable() #{(teacher_id, course_id), }
+    rooms = fetch_room_data() #{ (_id, name, type) }
+    day = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
+        ]
+    time = [
+        (7, 8), (8, 9), (9, 10), (10, 11), (11, 12), (12, 13), (13, 14), (14, 15)
+        ]
+
+    scheduling = define_scheduling(model, students, courses, teachers, rooms, day, time) #{(student_id, course_id, teachers_id, room_id, day, time)}
 
     # Return the model
     return model
